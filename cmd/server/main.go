@@ -23,6 +23,9 @@ func main() {
 	// Initialize router
 	router := gin.Default()
 
+	// Apply CORS middleware
+	router.Use(middleware.CORSMiddleware())
+
 	dbPath := os.Getenv("SQLITE_DB_PATH")
 	if dbPath == "" {
 		dbPath = "data/config.db"
