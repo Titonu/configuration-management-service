@@ -1,0 +1,584 @@
+openapi: 3.0.3
+info:
+  title: Configuration Management Service API
+  description: |
+    # Configuration Management Service
+    
+    This API provides a robust system for managing configuration data with schema validation, versioning, and rollback capabilities.
+    It enables teams to safely define, update, retrieve, and roll back configuration data while ensuring data integrity through JSON Schema validation.
+    
+    ## Key Features
+    - **Schema Validation**: Validate configuration data against JSON Schema definitions
+    - **Versioning**: Automatically track all changes to configurations
+    - **Rollback**: Easily revert to previous versions when needed
+
+    ## Getting Started
+    1. Register a schema for your configuration type
+    2. Create a configuration with data that conforms to the schema
+    3. Update configurations as needed, with automatic versioning
+    4. Roll back to previous versions if required
+  version: 1.0.0
+  contact:
+    name: Titonu
+    url: https://github.com/Titonu/configuration-management-service
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://config-management.example.com
+    description: Production server
+
+tags:
+  - name: Configurations
+    description: Operations for managing configurations
+  - name: Schemas
+    description: Operations for managing JSON schemas
+  - name: Health
+    description: Health check endpoint
+
+paths:
+  /api/v1/configurations:
+    post:
+      tags:
+        - Configurations
+      summary: Create a new configuration
+      description: |
+        Creates a new configuration with the provided name and data.
+        The data must conform to the registered JSON schema for the configuration name, if one exists.
+      operationId: createConfiguration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationCreateRequest'
+            example:
+              name: "payment-config"
+              data: {
+                "max_limit": 1000,
+                "enabled": true
+              }
+      responses:
+        '201':
+          description: Configuration created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  data:
+                    type: object
+                    description: The configuration data (structure varies based on configuration type)
+                  version:
+                    type: integer
+                    example: 1
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-08-10T07:25:28Z"
+        '400':
+          description: Invalid request or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Configuration already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/configurations/{name}:
+    get:
+      tags:
+        - Configurations
+      summary: Get a configuration
+      description: |
+        Retrieves the latest version of a configuration by its name.
+      operationId: getConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration to retrieve
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  data:
+                    type: object
+                    description: The configuration data (structure varies based on configuration type)
+                  version:
+                    type: integer
+                    example: 1
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-08-10T07:25:28Z"
+        '404':
+          description: Configuration not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Configurations
+      summary: Update a configuration
+      description: |
+        Updates an existing configuration with new data.
+        The data must conform to the registered JSON schema for the configuration name, if one exists.
+        A new version will be created automatically.
+      operationId: updateConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigurationUpdateRequest'
+            example:
+              data: {
+                "max_limit": 2000,
+                "enabled": false
+              }
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  data:
+                    type: object
+                    description: The updated configuration data
+                  version:
+                    type: integer
+                    example: 2
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-08-10T08:30:45Z"
+        '400':
+          description: Invalid request or validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Configuration not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/configurations/{name}/versions:
+    get:
+      tags:
+        - Configurations
+      summary: List configuration versions
+      description: |
+        Lists all versions of a specific configuration, including their creation timestamps and rollback status.
+      operationId: listConfigurationVersions
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration to list versions for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Configuration versions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionListResponse'
+        '404':
+          description: Configuration not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/configurations/{name}/versions/{version}:
+    get:
+      tags:
+        - Configurations
+      summary: Get a specific version of a configuration
+      description: |
+        Retrieves a specific version of a configuration by its name and version number.
+      operationId: getConfigurationVersion
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          description: Version number to retrieve
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Configuration version retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  data:
+                    type: object
+                    description: The configuration data at the specified version
+                  version:
+                    type: integer
+                    example: 1
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-08-10T07:25:28Z"
+        '404':
+          description: Configuration or version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/configurations/{name}/rollback:
+    post:
+      tags:
+        - Configurations
+      summary: Rollback a configuration
+      description: |
+        Rolls back a configuration to a previous version.
+        This creates a new version that contains the data from the target version.
+      operationId: rollbackConfiguration
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration to rollback
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RollbackRequest'
+            example:
+              target_version: 1
+      responses:
+        '200':
+          description: Configuration rolled back successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  data:
+                    type: object
+                    description: The configuration data from the target version
+                  version:
+                    type: integer
+                    example: 3
+                  created_at:
+                    type: string
+                    format: date-time
+                    example: "2025-08-10T09:15:30Z"
+                  is_rollback:
+                    type: boolean
+                    example: true
+                  rollback_from:
+                    type: integer
+                    example: 2
+                  rollback_to:
+                    type: integer
+                    example: 1
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Configuration or target version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/schemas/{name}:
+    post:
+      tags:
+        - Schemas
+      summary: Register a schema
+      description: |
+        Registers a JSON schema for a configuration type.
+        All configurations with this name must conform to this schema.
+      operationId: registerSchema
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration type to register a schema for
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A valid JSON Schema document
+            example:
+              {
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                  "max_limit": {
+                    "type": "integer"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["max_limit", "enabled"]
+              }
+      responses:
+        '201':
+          description: Schema registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    example: "payment-settings"
+                  status:
+                    type: string
+                    example: "schema registered successfully"
+        '400':
+          description: Invalid schema format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Schemas
+      summary: Get a schema
+      description: |
+        Retrieves the JSON schema for a configuration type.
+      operationId: getSchema
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Name of the configuration type to get the schema for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Schema retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                description: The JSON Schema document
+        '404':
+          description: Schema not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: |
+        Simple health check endpoint to verify the service is running.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+
+components:
+  schemas:
+    ConfigurationCreateRequest:
+      type: object
+      required:
+        - name
+        - data
+      properties:
+        name:
+          type: string
+          description: Unique name for the configuration
+          example: "payment-settings"
+        data:
+          type: object
+          description: Configuration data (must conform to the registered schema if one exists)
+          example:
+            max_limit: 1000
+            enabled: true
+
+    ConfigurationUpdateRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          description: New configuration data (must conform to the registered schema if one exists)
+          example:
+            max_limit: 2000
+            enabled: false
+
+    RollbackRequest:
+      type: object
+      required:
+        - target_version
+      properties:
+        target_version:
+          type: integer
+          description: Version number to roll back to
+          example: 1
+
+    VersionInfo:
+      type: object
+      properties:
+        version:
+          type: integer
+          description: Version number
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+          description: When this version was created
+          example: "2025-08-10T07:25:28Z"
+        is_rollback:
+          type: boolean
+          description: Whether this version was created by a rollback operation
+          example: false
+
+    VersionListResponse:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Configuration name
+          example: "payment-settings"
+        versions:
+          type: array
+          description: List of version information
+          items:
+            $ref: '#/components/schemas/VersionInfo'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Configuration not found"
+        code:
+          type: string
+          description: Error code
+          example: "not_found"
+        details:
+          type: object
+          nullable: true
+          description: Additional error details (if available)
