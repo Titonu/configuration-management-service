@@ -1,4 +1,4 @@
-.PHONY: all build run test test-integration test-unit clean lint fmt help docker-build docker-run docker-clean
+.PHONY: all build run test test-integration test-unit clean lint fmt help docker-build docker-run docker-clean docker-compose-up docker-compose-down docker-compose-dev
 
 # Variables
 APP_NAME = config-service
@@ -33,6 +33,9 @@ help:
 	@echo "  docker-build     - Build Docker image"
 	@echo "  docker-run       - Run application in Docker"
 	@echo "  docker-clean     - Clean Docker resources"
+	@echo "  docker-compose-up    - Start services using docker-compose"
+	@echo "  docker-compose-down  - Stop services using docker-compose"
+	@echo "  docker-compose-dev   - Start development services with hot reload"
 	@echo "  help             - Show this help message"
 
 # Build the application
@@ -96,3 +99,16 @@ docker-run:
 docker-clean:
 	@echo "Cleaning Docker resources..."
 	docker rmi $(DOCKER_IMAGE) || true
+
+# Docker Compose targets
+docker-compose-up:
+	@echo "Starting services with docker-compose..."
+	docker-compose up -d
+
+docker-compose-down:
+	@echo "Stopping services with docker-compose..."
+	docker-compose down
+
+docker-compose-dev:
+	@echo "Starting development services with hot reload..."
+	docker-compose --profile dev up -d

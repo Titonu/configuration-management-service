@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+  config-service:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data  # Mount data directory for SQLite persistence
+    environment:
+      - STORAGE_TYPE=sqlite
+      - SQLITE_DB_PATH=/app/data/config.db  # Corrected variable name
+      - GIN_MODE=release
+      - API_KEYS=dev-api-key:development,test-key:testing
+    restart: unless-stopped
+    
+  # Development service with hot reload
+  config-service-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8081:8080"
+    volumes:
+      - .:/app  # Mount entire project for hot reload
+      - ./data:/app/data  # Mount data directory for SQLite persistence
+    environment:
+      - STORAGE_TYPE=sqlite
+      - SQLITE_DB_PATH=/app/data/config.db  # Corrected variable name
+      - GIN_MODE=debug
+      - API_KEYS=dev-api-key:development,test-key:testing
+    restart: unless-stopped
+    profiles: ["dev"]
+
+volumes:
+  data:  # Define a named volume for data persistence
