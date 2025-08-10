@@ -11,12 +11,34 @@ info:
     - **Schema Validation**: Validate configuration data against JSON Schema definitions
     - **Versioning**: Automatically track all changes to configurations
     - **Rollback**: Easily revert to previous versions when needed
+    - **Authentication**: Secure API access with API key authentication for multi-user environments
 
     ## Getting Started
-    1. Register a schema for your configuration type
-    2. Create a configuration with data that conforms to the schema
-    3. Update configurations as needed, with automatic versioning
-    4. Roll back to previous versions if required
+    1. Obtain an API key for authentication
+    2. Register a schema for your configuration type
+    3. Create a configuration with data that conforms to the schema
+    4. Update configurations as needed, with automatic versioning
+    5. Roll back to previous versions if required
+    
+    ## Authentication
+    All endpoints (except the health check) require authentication using an API key.
+    Include the API key in the Authorization header using the Bearer token format:
+    
+    ```
+    Authorization: Bearer your-api-key
+    ```
+    
+    ### Using the OpenAPI UI
+    To authenticate in the OpenAPI UI:
+    
+    1. Click the "Authorize" button at the top of this page
+    2. Enter your API key in the value field (without "Bearer" prefix)
+    3. Click "Authorize" and close the dialog
+    4. Your requests will now include the Authorization header
+    
+    For testing, you can use: `dev-api-key`
+    
+    API keys are mapped to client IDs for multi-tenant usage and access control.
   version: 1.0.0
   contact:
     name: Titonu
@@ -39,6 +61,8 @@ tags:
 paths:
   /api/v1/configurations:
     post:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: Create a new configuration
@@ -100,6 +124,8 @@ paths:
 
   /api/v1/configurations/{name}:
     get:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: Get a configuration
@@ -148,6 +174,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     put:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: Update a configuration
@@ -216,6 +244,8 @@ paths:
 
   /api/v1/configurations/{name}/versions:
     get:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: List configuration versions
@@ -251,6 +281,8 @@ paths:
 
   /api/v1/configurations/{name}/versions/{version}:
     get:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: Get a specific version of a configuration
@@ -306,6 +338,8 @@ paths:
 
   /api/v1/configurations/{name}/rollback:
     post:
+      security:
+        - BearerAuth: []
       tags:
         - Configurations
       summary: Rollback a configuration
@@ -379,6 +413,8 @@ paths:
 
   /api/v1/schemas/{name}:
     post:
+      security:
+        - BearerAuth: []
       tags:
         - Schemas
       summary: Register a schema
@@ -442,6 +478,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     get:
+      security:
+        - BearerAuth: []
       tags:
         - Schemas
       summary: Get a schema
@@ -483,6 +521,8 @@ paths:
       summary: Health check
       description: |
         Simple health check endpoint to verify the service is running.
+        
+        **Note:** This is the only endpoint that does not require authentication.
       operationId: healthCheck
       responses:
         '200':
@@ -497,6 +537,36 @@ paths:
                     example: "ok"
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API key
+      description: |
+        # API Key Authentication
+        
+        ## How to Authenticate in OpenAPI UI
+        1. Click the "Authorize" button at the top of this page
+        2. Enter your API key in the value field (without "Bearer" prefix)
+        3. Click "Authorize" and close the dialog
+        4. Your requests will now include the Authorization header
+        
+        ## API Key Format
+        Include your API key in the Authorization header as `Bearer your-api-key`.
+        
+        Example: `Authorization: Bearer dev-api-key`
+        
+        ## Available API Keys
+        API keys are configured via the API_KEYS environment variable using the format:
+        ```
+        API_KEYS=key1:client1,key2:client2
+        ```
+        
+        For example: `API_KEYS=dev-api-key:development,test-key:testing`
+        
+        For testing, you can use: `dev-api-key`
+        
+        Each key is mapped to a client ID which is made available in the request context.
   schemas:
     ConfigurationCreateRequest:
       type: object
