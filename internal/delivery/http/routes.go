@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/Titonu/configuration-management-service/internal/delivery/http/handler"
+	"github.com/Titonu/configuration-management-service/internal/delivery/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -9,9 +10,13 @@ import (
 func SetupRoutes(
 	router *gin.Engine,
 	configHandler *handler.ConfigurationHandler,
+	authMiddleware *middleware.AuthMiddleware,
 ) {
 	// API version group
 	api := router.Group("/api/v1")
+
+	// Apply authentication middleware
+	api.Use(authMiddleware.Authenticate())
 
 	// Configuration routes
 	config := api.Group("/configurations")
