@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Titonu/configuration-management-service/internal/delivery/http/handler"
+	"github.com/Titonu/configuration-management-service/internal/delivery/http/middleware"
 	"github.com/Titonu/configuration-management-service/internal/domain/repository"
 	"github.com/Titonu/configuration-management-service/internal/domain/usecase"
 	"github.com/Titonu/configuration-management-service/internal/repository/sqlite"
@@ -22,10 +23,13 @@ import (
 // ConfigurationAPITestSuite is a test suite for the Configuration API
 type ConfigurationAPITestSuite struct {
 	suite.Suite
-	router        *gin.Engine
-	dbPath        string
-	configRepo    repository.ConfigurationRepository
-	configUseCase usecase.ConfigurationUsecase
+	router         *gin.Engine
+	dbPath         string
+	configRepo     repository.ConfigurationRepository
+	configUseCase  usecase.ConfigurationUsecase
+	authMiddleware *middleware.AuthMiddleware
+	validAPIKey    string
+	clientID       string
 }
 
 // SetupSuite sets up the test suite
@@ -59,6 +63,14 @@ func (suite *ConfigurationAPITestSuite) SetupSuite() {
 	// Initialize handlers
 	configHandler := handler.NewConfigurationHandler(suite.configUseCase)
 
+	// Setup authentication middleware with test API keys
+	suite.validAPIKey = "test-api-key"
+	suite.clientID = "test-client"
+	apiKeys := map[string]string{
+		suite.validAPIKey: suite.clientID,
+	}
+	suite.authMiddleware = middleware.NewAuthMiddleware(apiKeys)
+
 	// Initialize router
 	suite.router = gin.New()
 	suite.router.Use(gin.Recovery())
@@ -67,8 +79,9 @@ func (suite *ConfigurationAPITestSuite) SetupSuite() {
 	// API version group
 	api := suite.router.Group("/api/v1")
 
-	// Configuration routes
+	// Configuration routes - protected by auth middleware
 	config := api.Group("/configurations")
+	config.Use(suite.authMiddleware.Authenticate())
 	{
 		// Create a new configuration
 		config.POST("", configHandler.CreateConfiguration)
@@ -89,8 +102,9 @@ func (suite *ConfigurationAPITestSuite) SetupSuite() {
 		config.POST("/:name/rollback", configHandler.RollbackConfiguration)
 	}
 
-	// Schema routes
+	// Schema routes - protected by auth middleware
 	schema := api.Group("/schemas")
+	schema.Use(suite.authMiddleware.Authenticate())
 	{
 		// Register a schema for a configuration
 		schema.POST("/:name", configHandler.RegisterSchema)
@@ -132,8 +146,9 @@ func (suite *ConfigurationAPITestSuite) SetupTest() {
 	// Set up routes
 	api := suite.router.Group("/api/v1")
 
-	// Configuration routes
+	// Configuration routes - protected by auth middleware
 	config := api.Group("/configurations")
+	config.Use(suite.authMiddleware.Authenticate())
 	{
 		config.POST("", configHandler.CreateConfiguration)
 		config.GET("/:name", configHandler.GetConfiguration)
@@ -143,14 +158,15 @@ func (suite *ConfigurationAPITestSuite) SetupTest() {
 		config.POST("/:name/rollback", configHandler.RollbackConfiguration)
 	}
 
-	// Schema routes
+	// Schema routes - protected by auth middleware
 	schema := api.Group("/schemas")
+	schema.Use(suite.authMiddleware.Authenticate())
 	{
 		schema.POST("/:name", configHandler.RegisterSchema)
 		schema.GET("/:name", configHandler.GetSchema)
 	}
 
-	// Health check endpoint
+	// Health check endpoint (no auth required)
 	suite.router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
@@ -578,6 +594,89 @@ func (suite *ConfigurationAPITestSuite) TestConfigurationNotFound() {
 
 	// Assert the response
 	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+// TestAuthenticationUnauthorized tests that requests without an Authorization header are rejected
+func (suite *ConfigurationAPITestSuite) TestAuthenticationUnauthorized() {
+	t := suite.T()
+
+	// Create a request without an Authorization header
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/configurations/payment-config", nil)
+
+	// Create a response recorder
+	w := httptest.NewRecorder()
+
+	// Perform the request
+	suite.router.ServeHTTP(w, req)
+
+	// Assert the response
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+	// Parse the response
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+
+	// Verify error message
+	assert.Equal(t, "API key is required", response["message"])
+	assert.Equal(t, "unauthorized", response["code"])
+}
+
+// TestAuthenticationInvalidAPIKey tests that requests with an invalid API key are rejected
+func (suite *ConfigurationAPITestSuite) TestAuthenticationInvalidAPIKey() {
+	t := suite.T()
+
+	// Create a request with an invalid API key
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/configurations/payment-config", nil)
+	req.Header.Set("Authorization", "Bearer invalid-api-key")
+
+	// Create a response recorder
+	w := httptest.NewRecorder()
+
+	// Perform the request
+	suite.router.ServeHTTP(w, req)
+
+	// Assert the response
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+
+	// Parse the response
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+
+	// Verify error message
+	assert.Equal(t, "Invalid API key", response["message"])
+	assert.Equal(t, "unauthorized", response["code"])
+}
+
+// TestAuthenticationValidAPIKey tests that requests with a valid API key are accepted
+func (suite *ConfigurationAPITestSuite) TestAuthenticationValidAPIKey() {
+	t := suite.T()
+
+	// First register a schema to have something to retrieve
+	suite.TestRegisterSchema()
+
+	// Create a request with a valid API key
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/schemas/payment-config", nil)
+	req.Header.Set("Authorization", "Bearer "+suite.validAPIKey)
+
+	// Create a response recorder
+	w := httptest.NewRecorder()
+
+	// Perform the request
+	suite.router.ServeHTTP(w, req)
+
+	// Assert the response
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Parse the response to ensure it's valid JSON
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+
+	// Verify that the response contains schema data
+	_, ok := response["type"]
+	assert.True(t, ok, "Response should contain schema data")
 }
 
 // TestConfigurationAPITestSuite runs the test suite

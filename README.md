@@ -180,6 +180,23 @@ For example: `API_KEYS=dev-api-key:development,test-key:testing`
 
 For testing, you can use: `dev-api-key`
 
+### Production Readiness and Multi-User Support
+The API key authentication mechanism is designed for production readiness in multi-user environments:
+
+1. **Client Isolation**: Each API key is associated with a client identifier, allowing for multi-tenant usage where different teams or services can have their own keys.
+
+2. **Access Control**: The authentication middleware validates all requests, ensuring only authorized clients can access or modify configurations.
+
+3. **Audit Trail**: Client identifiers are logged with each request, providing accountability and traceability in multi-user environments.
+
+4. **Security**: API keys can be rotated or revoked independently without affecting other users of the system.
+
+5. **Scalability**: The authentication scheme supports multiple concurrent users and services without performance degradation.
+
+6. **Environment Separation**: Different API keys can be used for different environments (development, staging, production) while using the same service instance.
+
+This approach ensures the Configuration Management Service can be safely deployed in production environments where multiple teams or services need to access and manage configurations securely.
+
 ### Using the OpenAPI UI
 To authenticate in the OpenAPI UI:
 
@@ -307,7 +324,7 @@ SQLite was chosen for simplicity and ease of setup. For production use with high
 A custom error handling package provides structured error responses with error codes, messages, and details. This ensures consistent error reporting across the API.
 
 ### Authentication
-A simple API key authentication mechanism was implemented. For production use, more robust authentication like OAuth2 or JWT might be preferred.
+A client-based API key authentication mechanism was implemented to support multi-tenant usage in production environments. Each API key is associated with a specific client identifier, enabling request tracking, access control, and client isolation. For even more robust security in larger deployments, this could be extended to OAuth2 or JWT authentication with role-based access control.
 
 ### JSON Schema Validation
 JSON Schema validation ensures that configuration data adheres to predefined structures, preventing invalid configurations from being stored.
