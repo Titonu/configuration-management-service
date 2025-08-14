@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23.1-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
@@ -21,7 +21,6 @@ RUN apk --no-cache add ca-certificates sqlite
 
 WORKDIR /root/
 COPY --from=builder /app/config-service .
-COPY --from=builder /app/config ./config
 
 # Create directory for SQLite database
 RUN mkdir -p /root/data
